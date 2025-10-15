@@ -5,7 +5,7 @@ export default function Settings() {
   const [categories, setCategories] = useState([]);
   const [cards, setCards] = useState([]);
   const [catForm, setCatForm] = useState({ name:'', type:'expense', color:'#3b82f6' });
-  const [cardForm, setCardForm] = useState({ name:'', color:'#3b82f6' });
+  const [cardForm, setCardForm] = useState({ name:'', color:'#3b82f6', last4:'' });
 
   const load = async () => {
     const [catRes, cardRes] = await Promise.all([api.get('/categories'), api.get('/cards')]);
@@ -23,7 +23,7 @@ export default function Settings() {
   const addCard = async (e) => {
     e.preventDefault();
     await api.post('/cards', cardForm);
-    setCardForm({ name:'', color:'#3b82f6' });
+    setCardForm({ name:'', color:'#3b82f6', last4:'' });
     load();
   };
 
@@ -76,6 +76,10 @@ export default function Settings() {
           <div className="flex gap-3 flex-wrap">
             <input className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Card Name" value={cardForm.name} onChange={(e)=>setCardForm(v=>({ ...v, name:e.target.value }))} required />
             <input className="border border-gray-300 rounded-md px-2 py-2" type="color" value={cardForm.color} onChange={(e)=>setCardForm(v=>({ ...v, color:e.target.value }))} />
+            <input className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Last 4 digits" value={cardForm.last4} onChange={(e)=>{
+              const val = e.target.value.replace(/\D/g,'').slice(0,4);
+              setCardForm(v=>({ ...v, last4: val }));
+            }} inputMode="numeric" maxLength={4} required />
             <button className="px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700" type="submit">Add</button>
           </div>
         </form>

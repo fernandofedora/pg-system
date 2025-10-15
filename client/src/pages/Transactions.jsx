@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
+import { formatAmount } from '../utils/format';
 
 export default function Transactions() {
   const [categories, setCategories] = useState([]);
@@ -9,9 +10,9 @@ export default function Transactions() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [deleteTargetId, setDeleteTargetId] = useState(null);
+  const [budgetDeleteId, setBudgetDeleteId] = useState(null);
 
-  const [expense, setExpense] = useState({ description:'', categoryId:'', amount:'', date:'', method:'cash', cardId:'' });
-  const [income, setIncome] = useState({ description:'', categoryId:'', amount:'', date:'' });
+  const [newTx, setNewTx] = useState({ type:'expense', description:'', categoryId:'', amount:'', date:'', method:'cash', cardId:'' });
 
   const [budget, setBudget] = useState({ month:'', year:'', amount:'' });
   const [budgets, setBudgets] = useState([]);
@@ -38,26 +39,35 @@ export default function Transactions() {
   useEffect(() => { if (!success) return; const t = setTimeout(() => setSuccess(''), 4000); return () => clearTimeout(t); }, [success]);
   useEffect(() => { if (!error) return; const t = setTimeout(() => setError(''), 6000); return () => clearTimeout(t); }, [error]);
 
-  const addExpense = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post('/transactions', { ...expense, type:'expense', paymentMethod: expense.method, amount: parseFloat(expense.amount || 0) });
-      setExpense({ description:'', categoryId:'', amount:'', date:'', method:'cash', cardId:'' });
-      setError('');
-      setSuccess('Expense added');
-      load();
-    } catch{ setSuccess(''); setError('Failed to add expense'); }
-  };
+  
 
-  const addIncome = async (e) => {
+  // Formulario unificado para agregar transacciones (Expense/Income)
+  const addTransaction = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/transactions', { ...income, type:'income', amount: parseFloat(income.amount || 0), paymentMethod:'cash' });
-      setIncome({ description:'', categoryId:'', amount:'', date:'' });
+      const payload = {
+        type: newTx.type,
+        description: newTx.description,
+        categoryId: newTx.categoryId || null,
+        amount: parseFloat(newTx.amount || 0),
+        date: newTx.date,
+        paymentMethod: newTx.type === 'expense' ? (newTx.method || 'cash') : 'cash',
+        cardId: newTx.type === 'expense' && newTx.method === 'card' ? (newTx.cardId || null) : null,
+      };
+      if (payload.type === 'expense' && payload.paymentMethod === 'card' && !payload.cardId) {
+        setSuccess('');
+        setError('Please select a card for card payments');
+        return;
+      }
+      await api.post('/transactions', payload);
+      setNewTx({ type:'expense', description:'', categoryId:'', amount:'', date:'', method:'cash', cardId:'' });
       setError('');
-      setSuccess('Income added');
+      setSuccess('Transaction added');
       load();
-    } catch{ setSuccess(''); setError('Failed to add income'); }
+    } catch {
+      setSuccess('');
+      setError('Failed to add transaction');
+    }
   };
 
   const setMonthlyBudget = async (e) => {
@@ -130,6 +140,20 @@ const DELETE_TRANSACTION_LEGACY = async () => { /* replaced by modal-based delet
       setError('Failed to delete transaction');
     }
   };
+  // Confirmación de eliminación de presupuesto
+  const confirmDeleteBudget = async () => {
+    if (budgetDeleteId === null) return;
+    try {
+      await api.delete(`/budgets/${budgetDeleteId}`);
+      setBudgetDeleteId(null);
+      setError('');
+      setSuccess('Budget deleted');
+      load();
+    } catch {
+      setSuccess('');
+      setError('Failed to delete budget');
+    }
+  };
   const filtered = transactions.filter(t => typeFilter==='all' || t.type===typeFilter);
 
   return (
@@ -149,175 +173,178 @@ const DELETE_TRANSACTION_LEGACY = async () => { /* replaced by modal-based delet
         onConfirm={confirmDelete}
         onCancel={()=>setDeleteTargetId(null)}
       />
-      {deleteTargetId !== null && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full">
-            <h4 className="text-lg font-semibold mb-2">Delete transaction</h4>
-            <p className="text-gray-600 mb-4">Are you sure you want to delete this transaction? This action cannot be undone.</p>
-            <div className="flex justify-end gap-2">
-              <button className="px-3 py-2 rounded-md bg-gray-200 text-gray-800 hover:bg-gray-300" onClick={()=>setDeleteTargetId(null)}>Cancel</button>
-              <button className="px-3 py-2 rounded-md bg-rose-600 text-white hover:bg-rose-700" onClick={confirmDelete}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="text-lg font-semibold mb-3">Budget</h3>
-        <form className="space-y-3" onSubmit={setMonthlyBudget}>
-          <div className="flex gap-3 flex-wrap">
-            <select className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={budget.month} onChange={(e)=>setBudget(v=>({ ...v, month:e.target.value }))} required>
-              <option value="">Month</option>
-              {Array.from({length:12},(_,i)=> <option key={i+1} value={String(i+1).padStart(2,'0')}>{new Date(0,i).toLocaleString('en',{ month:'long'})}</option>)}
-            </select>
-            <input className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="number" placeholder="Year" value={budget.year} onChange={(e)=>setBudget(v=>({ ...v, year:e.target.value }))} required />
-            <input className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="number" step="0.01" placeholder="Amount" value={budget.amount} onChange={(e)=>setBudget(v=>({ ...v, amount:e.target.value }))} required />
-            <button className="px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700" type="submit">Set</button>
-          </div>
-        </form>
-        <ul className="divide-y divide-gray-100 mt-3">
-          {budgets.map(b => (
-            <li key={b.id}><span>{b.month}/{b.year}</span><span className="ml-auto font-medium">${Number(b.amount).toFixed(2)}</span></li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="text-lg font-semibold mb-3">Add Expense</h3>
-        <form className="space-y-3" onSubmit={addExpense}>
-          <input className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Description" value={expense.description} onChange={(e)=>setExpense(v=>({ ...v, description:e.target.value }))} required />
-          <div className="flex gap-3 flex-wrap">
-            <select className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={expense.categoryId} onChange={(e)=>setExpense(v=>({ ...v, categoryId:e.target.value }))} required>
-              <option value="">Category</option>
-              {categories.filter(c=>c.type==='expense').map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <input className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="number" step="0.01" placeholder="Amount" value={expense.amount} onChange={(e)=>setExpense(v=>({ ...v, amount:e.target.value }))} required />
-            <input className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="date" value={expense.date} onChange={(e)=>setExpense(v=>({ ...v, date:e.target.value }))} required />
-          </div>
-          <div className="flex gap-3 flex-wrap">
-            <select className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={expense.method} onChange={(e)=>setExpense(v=>({ ...v, method:e.target.value }))}>
-              <option value="cash">Cash</option>
-              <option value="card">Credit Card</option>
-            </select>
-            {expense.method==='card' && (
-              <select className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={expense.cardId} onChange={(e)=>setExpense(v=>({ ...v, cardId:e.target.value }))} required>
-                <option value="">Select Card</option>
-                {cards.map(card => <option key={card.id} value={card.id}>{card.name}</option>)}
+      <ConfirmModal
+        open={budgetDeleteId !== null}
+        title="Delete budget"
+        message="Are you sure you want to delete this budget?"
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDeleteBudget}
+        onCancel={()=>setBudgetDeleteId(null)}
+      />
+      
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl shadow p-4">
+          <h3 className="text-lg font-semibold mb-3">Monthly Budget</h3>
+          <form className="space-y-3" onSubmit={setMonthlyBudget}>
+            <div className="flex gap-3 flex-wrap">
+              <select className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={budget.month} onChange={(e)=>setBudget(v=>({ ...v, month:e.target.value }))} required>
+                <option value="">Month</option>
+                {Array.from({length:12},(_,i)=> <option key={i+1} value={String(i+1).padStart(2,'0')}>{new Date(0,i).toLocaleString('es',{ month:'long'})}</option>)}
               </select>
-            )}
-          </div>
-          <button className="px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700" type="submit">Add Expense</button>
-        </form>
-      </div>
-
-      <div className="bg-white rounded-xl shadow p-4">
-        <h3 className="text-lg font-semibold mb-3">Add Income</h3>
-        <form className="space-y-3" onSubmit={addIncome}>
-          <input className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Description" value={income.description} onChange={(e)=>setIncome(v=>({ ...v, description:e.target.value }))} required />
-          <div className="flex gap-3 flex-wrap">
-            <select className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={income.categoryId} onChange={(e)=>setIncome(v=>({ ...v, categoryId:e.target.value }))} required>
-              <option value="">Category</option>
-              {categories.filter(c=>c.type==='income').map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <input className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="date" value={income.date} onChange={(e)=>setIncome(v=>({ ...v, date:e.target.value }))} required />
-            <input className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="number" step="0.01" placeholder="Amount" value={income.amount} onChange={(e)=>setIncome(v=>({ ...v, amount:e.target.value }))} required />
-          </div>
-          <button className="px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700" type="submit">Add Income</button>
-        </form>
-      </div>
-
-      <div className="bg-white rounded-xl shadow p-4">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="text-lg font-semibold">Transactions</h3>
-          <select className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={typeFilter} onChange={(e)=>setTypeFilter(e.target.value)}>
-            <option value="all">All</option>
-            <option value="expense">Expenses</option>
-            <option value="income">Income</option>
-          </select>
-        </div>
-        <table className="min-w-full border border-gray-200 rounded-xl overflow-hidden">
-          <thead>
-            <tr className="bg-gray-50">
-              <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">Type</th>
-              <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">Description</th>
-              <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">Category</th>
-              <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">Amount</th>
-              <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">Date</th>
-              <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">Method</th>
-              <th className="px-3 py-2 text-left text-sm font-semibold text-gray-700">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(t => (
-              <tr key={t.id}>
-                {editingId === t.id ? (
+              <input className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="number" placeholder="Year" value={budget.year} onChange={(e)=>setBudget(v=>({ ...v, year:e.target.value }))} required />
+              <input className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="number" step="0.01" placeholder="Amount" value={budget.amount} onChange={(e)=>setBudget(v=>({ ...v, amount:e.target.value }))} required />
+              <button className="px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-700" type="submit">Save Budget</button>
+            </div>
+          </form>
+          <ul className="divide-y divide-gray-100 mt-3">
+            {budgets.map(b => (
+              <li key={b.id} className="flex items-center justify-between py-2">
+                <span>{String(b.month).padStart(2,'0')}/{b.year}</span>
+                <div className="flex items-center gap-3">
+                  <span className="font-medium">{formatAmount(b.amount)}</span>
+                  <button className="px-2 py-1 rounded-md bg-rose-600 text-white hover:bg-rose-700" onClick={()=>setBudgetDeleteId(b.id)}>Delete</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-6 border-t pt-4">
+            <h3 className="text-lg font-semibold mb-3">Add Transaction</h3>
+            <div className="inline-flex rounded-md shadow-sm mb-3" role="group">
+              <button type="button" className={`${newTx.type==='expense' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'} px-3 py-2 border rounded-l-md`} onClick={()=>setNewTx(v=>({ ...v, type:'expense', method:'cash', cardId:'' }))}>Expense</button>
+              <button type="button" className={`${newTx.type==='income' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300'} px-3 py-2 border rounded-r-md`} onClick={()=>setNewTx(v=>({ ...v, type:'income', method:'cash', cardId:'' }))}>Income</button>
+            </div>
+            <form className="space-y-3" onSubmit={addTransaction}>
+              <input className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Description" value={newTx.description} onChange={(e)=>setNewTx(v=>({ ...v, description:e.target.value }))} required />
+              <div className="flex gap-3 flex-wrap">
+                <input className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="number" step="0.01" placeholder="Amount" value={newTx.amount} onChange={(e)=>setNewTx(v=>({ ...v, amount:e.target.value }))} required />
+                <input className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" type="date" value={newTx.date} onChange={(e)=>setNewTx(v=>({ ...v, date:e.target.value }))} required />
+              </div>
+              <div className="flex gap-3 flex-wrap">
+                <select className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={newTx.categoryId} onChange={(e)=>setNewTx(v=>({ ...v, categoryId:e.target.value }))} required>
+                  <option value="">Category</option>
+                  {categories.filter(c=>c.type===newTx.type).map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                {newTx.type==='expense' && (
                   <>
-                    <td>
-                      <select className="border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={editData.type} onChange={(e)=>setEditData(v=>({ ...v, type:e.target.value, paymentMethod: e.target.value==='income' ? 'cash' : v.paymentMethod }))}>
-                        <option value="expense">expense</option>
-                        <option value="income">income</option>
+                    <select className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={newTx.method} onChange={(e)=>setNewTx(v=>({ ...v, method:e.target.value }))}>
+                      <option value="cash">Cash</option>
+                      <option value="card">Credit Card</option>
+                    </select>
+                    {newTx.method==='card' && (
+                      <select className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={newTx.cardId} onChange={(e)=>setNewTx(v=>({ ...v, cardId:e.target.value }))} required>
+                        <option value="">Select Card</option>
+                        {cards.map(card => <option key={card.id} value={card.id}>{card.name}</option>)}
                       </select>
-                    </td>
-                    <td>
-                      <input className="border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={editData.description} onChange={(e)=>setEditData(v=>({ ...v, description:e.target.value }))} />
-                    </td>
-                    <td>
-                      <select className="border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={editData.categoryId} onChange={(e)=>setEditData(v=>({ ...v, categoryId:e.target.value }))}>
-                        <option value="">Category</option>
-                        {categories.filter(c=>c.type===editData.type).map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      <input type="number" step="0.01" value={editData.amount} onChange={(e)=>setEditData(v=>({ ...v, amount:e.target.value }))} />
-                    </td>
-                    <td>
-                      <input type="date" value={editData.date} onChange={(e)=>setEditData(v=>({ ...v, date:e.target.value }))} />
-                    </td>
-                    <td>
-                      {editData.type==='expense' ? (
-                        <div className="flex gap-2">
-                          <select className="border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={editData.paymentMethod} onChange={(e)=>setEditData(v=>({ ...v, paymentMethod:e.target.value }))}>
-                            <option value="cash">Cash</option>
-                            <option value="card">Credit Card</option>
-                          </select>
-                          {editData.paymentMethod==='card' && (
-                            <select className="border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={editData.cardId || ''} onChange={(e)=>setEditData(v=>({ ...v, cardId:e.target.value }))}>
-                              <option value="">Select Card</option>
-                              {cards.map(card => <option key={card.id} value={card.id}>{card.name}</option>)}
-                            </select>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-gray-500">Cash</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="flex gap-2">
-                        <button className="px-3 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700" onClick={saveEdit}>Save</button>
-                        <button className="px-3 py-2 rounded-md bg-gray-200 text-gray-800 hover:bg-gray-300" onClick={cancelEdit}>Cancel</button>
-                      </div>
-                    </td>
-                  </>
-                ) : (
-                  <>
-                    <td className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${t.type==='expense' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{t.type}</td>
-                    <td>{t.description}</td>
-                    <td>{t.Category?.name || ''}</td>
-                    <td className={`text-sm ${t.type==='expense' ? 'text-rose-600' : 'text-emerald-600'}`}>${t.amount.toFixed(2)}</td>
-                    <td>{t.date}</td>
-                    <td>{t.paymentMethod==='card' ? (t.Card?.name || 'Card') : 'Cash'}</td>
-                    <td>
-                      <div className="flex gap-2">
-                        <button className="px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700" onClick={()=>startEdit(t)}>Edit</button>
-                        <button className="px-3 py-2 rounded-md bg-rose-600 text-white hover:bg-rose-700" onClick={()=>setDeleteTargetId(t.id)}>Delete</button>
-                      </div>
-                    </td>
+                    )}
                   </>
                 )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              </div>
+              <button className="px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700" type="submit">{newTx.type==='expense' ? 'Add Expense' : 'Add Income'}</button>
+            </form>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow p-4 md:col-span-2">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-lg font-semibold">Transaction History</h3>
+            <select className="border border-gray-300 rounded-md px-3 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" value={typeFilter} onChange={(e)=>setTypeFilter(e.target.value)}>
+              <option value="all">All</option>
+              <option value="expense">Expenses</option>
+              <option value="income">Income</option>
+            </select>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full table-fixed text-sm">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide w-28">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide w-[30%]">Description</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide w-32">Category</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide w-28">Amount</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide w-32">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide w-32">Payment</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide w-40">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+              {filtered.map(t => (
+                <tr key={t.id} className="hover:bg-gray-50">
+                  {editingId === t.id ? (
+                    <>
+                      <td className="px-4 py-2 align-middle">
+                        <select className="border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500" value={editData.type} onChange={(e)=>setEditData(v=>({ ...v, type:e.target.value, paymentMethod: e.target.value==='income' ? 'cash' : v.paymentMethod }))}>
+                          <option value="expense">expense</option>
+                          <option value="income">income</option>
+                        </select>
+                      </td>
+                      <td className="px-4 py-2 align-middle">
+                        <input className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" value={editData.description} onChange={(e)=>setEditData(v=>({ ...v, description:e.target.value }))} />
+                      </td>
+                      <td className="px-4 py-2 align-middle">
+                        <select className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" value={editData.categoryId} onChange={(e)=>setEditData(v=>({ ...v, categoryId:e.target.value }))}>
+                          <option value="">Category</option>
+                          {categories.filter(c=>c.type===editData.type).map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-4 py-2 align-middle text-right">
+                        <input className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-28 text-right" type="number" step="0.01" value={editData.amount} onChange={(e)=>setEditData(v=>({ ...v, amount:e.target.value }))} />
+                      </td>
+                      <td className="px-4 py-2 align-middle">
+                        <input className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" type="date" value={editData.date} onChange={(e)=>setEditData(v=>({ ...v, date:e.target.value }))} />
+                      </td>
+                      <td className="px-4 py-2 align-middle">
+                        {editData.type==='expense' ? (
+                          <div className="flex items-center gap-2">
+                            <select className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" value={editData.paymentMethod} onChange={(e)=>setEditData(v=>({ ...v, paymentMethod:e.target.value }))}>
+                              <option value="cash">Cash</option>
+                              <option value="card">Credit Card</option>
+                            </select>
+                            {editData.paymentMethod==='card' && (
+                              <select className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" value={editData.cardId || ''} onChange={(e)=>setEditData(v=>({ ...v, cardId:e.target.value }))}>
+                                <option value="">Select Card</option>
+                                {cards.map(card => <option key={card.id} value={card.id}>{card.name}</option>)}
+                              </select>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-500">Cash</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 align-middle">
+                        <div className="flex items-center justify-end gap-2">
+                          <button className="h-9 px-3 text-sm rounded-md bg-emerald-600 text-white hover:bg-emerald-700" onClick={saveEdit}>Save</button>
+                          <button className="h-9 px-3 text-sm rounded-md bg-gray-200 text-gray-800 hover:bg-gray-300" onClick={cancelEdit}>Cancel</button>
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="px-4 py-2 align-middle">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${t.type==='expense' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{t.type}</span>
+                      </td>
+                      <td className="px-4 py-2 align-middle truncate">{t.description}</td>
+                      <td className="px-4 py-2 align-middle">{t.Category?.name || ''}</td>
+                      <td className={`px-4 py-2 align-middle text-right ${t.type==='expense' ? 'text-rose-600' : 'text-emerald-600'}`}>{formatAmount(t.amount)}</td>
+                      <td className="px-4 py-2 align-middle">{t.date}</td>
+                      <td className="px-4 py-2 align-middle">{t.paymentMethod==='card' ? (t.Card?.name || 'Card') : 'Cash'}</td>
+                      <td className="px-4 py-2 align-middle">
+                        <div className="flex items-center justify-end gap-2">
+                          <button className="h-9 px-3 text-sm rounded-md bg-indigo-600 text-white hover:bg-indigo-700" onClick={()=>startEdit(t)}>Edit</button>
+                          <button className="h-9 px-3 text-sm rounded-md bg-rose-600 text-white hover:bg-rose-700" onClick={()=>setDeleteTargetId(t.id)}>Delete</button>
+                        </div>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+            </table>
+          </div>
+        </div>
       </div>
+
+      
     </div>
   );
 }
