@@ -31,6 +31,16 @@ export default function Dashboard() {
     return summary.incomeVsExpense.map(d => ({ date: d.date, income: d.income, expense: d.expense }));
   }, [summary]);
 
+  // Budget vs Actual progress (only meaningful for a specific month)
+  const budgetProgress = useMemo(() => {
+    if (!summary) return { budget: 0, actual: 0, remaining: 0, consumedPercent: 0 };
+    const budget = Number(summary.budgetAmount || 0);
+    const actual = Number(summary.totals?.expense || 0);
+    const remaining = budget - actual;
+    const consumedPercent = budget > 0 ? Math.round((actual / budget) * 100) : 0;
+    return { budget, actual, remaining, consumedPercent };
+  }, [summary]);
+
   const onExport = async () => {
     try {
       const year = new Date().getFullYear();
@@ -94,6 +104,36 @@ export default function Dashboard() {
             </LineChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      {/* Budget vs Actual - Progress bar */}
+      <div className="bg-white rounded-xl shadow p-4">
+        <h3 className="text-lg font-semibold mb-3">Budget vs Actual</h3>
+        {period === 'all' ? (
+          <p className="text-gray-500">Select a specific month to compare against the monthly budget.</p>
+        ) : summary?.budgetAmount == null ? (
+          <p className="text-gray-500">No budget set for this month.</p>
+        ) : (
+          <div>
+            {/* Progress bar */}
+            <div className="mb-2 flex items-center justify-between text-sm">
+              <span className="text-gray-600">Budget: <span className="font-medium">${budgetProgress.budget.toFixed(2)}</span></span>
+              <span className="text-gray-600">Actual: <span className="font-medium text-rose-600">${budgetProgress.actual.toFixed(2)}</span></span>
+            </div>
+            <div className="w-full h-3 bg-gray-200 rounded overflow-hidden">
+              <div
+                className={`h-3 ${budgetProgress.remaining >= 0 ? 'bg-emerald-500' : 'bg-rose-500'} rounded`}
+                style={{ width: `${Math.min(budgetProgress.consumedPercent, 100)}%` }}
+              />
+            </div>
+            <div className="mt-2 text-sm">
+              <span className="text-gray-600">Consumo:</span> <span className={`font-medium ${budgetProgress.remaining >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{budgetProgress.consumedPercent}%{budgetProgress.consumedPercent > 100 ? ' (sobre presupuesto)' : ''}</span>
+            </div>
+            <div className="mt-1 text-sm">
+              <span className="text-gray-600">Estado restante:</span> <span className={`font-medium ${budgetProgress.remaining < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>${budgetProgress.remaining.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow p-4">
