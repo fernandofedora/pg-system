@@ -302,7 +302,7 @@ const DELETE_TRANSACTION_LEGACY = async () => { /* replaced by modal-based delet
                     <td className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${t.type==='expense' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{t.type}</td>
                     <td>{t.description}</td>
                     <td>{t.Category?.name || ''}</td>
-                    <td className={`text-sm ${t.type==='expense' ? 'text-rose-600' : 'text-emerald-600'}`}>${t.amount.toFixed(2)}</td>
+                    <td className={`text-sm ${t.type==='expense' ? 'text-rose-600' : 'text-emerald-600'}`}>${parseFloat(t.amount ?? 0).toFixed(2)}</td>
                     <td>{t.date}</td>
                     <td>{t.paymentMethod==='card' ? (t.Card?.name || 'Card') : 'Cash'}</td>
                     <td>

@@ -105,7 +105,7 @@ export default function Settings() {
                 <option value="expense">Expense</option>
                 <option value="income">Income</option>
               </select>
-              <input className="border border-gray-300 rounded-md px-2 py-2" type="color" value={catForm.color} onChange={(e)=>setCatForm(v=>({ ...v, color:e.target.value }))} />
+              <input className="border border-gray-300 rounded-md w-16 h-10 p-0 cursor-pointer bg-transparent [appearance:auto]" type="color" value={catForm.color} onChange={(e)=>setCatForm(v=>({ ...v, color:e.target.value }))} />
               <button className="px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700" type="submit">Save</button>
             </div>
           </form>
@@ -124,7 +124,7 @@ export default function Settings() {
                       <option value="expense">Expense</option>
                       <option value="income">Income</option>
                     </select>
-                    <input className="border border-gray-300 rounded-md px-2 py-1" type="color" value={editCatForm.color} onChange={(e)=>setEditCatForm(v=>({ ...v, color:e.target.value }))} />
+                    <input className="border border-gray-300 rounded-md w-14 h-8 p-0 cursor-pointer bg-transparent [appearance:auto]" type="color" value={editCatForm.color} onChange={(e)=>setEditCatForm(v=>({ ...v, color:e.target.value }))} />
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
@@ -167,7 +167,7 @@ export default function Settings() {
                       <option value="expense">Expense</option>
                       <option value="income">Income</option>
                     </select>
-                    <input className="border border-gray-300 rounded-md px-2 py-1" type="color" value={editCatForm.color} onChange={(e)=>setEditCatForm(v=>({ ...v, color:e.target.value }))} />
+                    <input className="border border-gray-300 rounded-md w-14 h-8 p-0 cursor-pointer bg-transparent [appearance:auto]" type="color" value={editCatForm.color} onChange={(e)=>setEditCatForm(v=>({ ...v, color:e.target.value }))} />
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
@@ -212,7 +212,7 @@ export default function Settings() {
           <form className="mt-4" onSubmit={addCard}>
             <div className="flex gap-3 flex-wrap items-center">
               <input className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Card Name" value={cardForm.name} onChange={(e)=>setCardForm(v=>({ ...v, name:e.target.value }))} required />
-              <input className="border border-gray-300 rounded-md px-2 py-2" type="color" value={cardForm.color} onChange={(e)=>setCardForm(v=>({ ...v, color:e.target.value }))} />
+              <input className="border border-gray-300 rounded-md w-16 h-10 p-0 cursor-pointer bg-transparent [appearance:auto]" type="color" value={cardForm.color} onChange={(e)=>setCardForm(v=>({ ...v, color:e.target.value }))} />
               <input className="border border-gray-300 rounded-md px-3 py-2 w-28" placeholder="Last 4" value={cardForm.last4} onChange={(e)=>setCardForm(v=>({ ...v, last4:e.target.value.replace(/[^0-9]/g,'').slice(0,4) }))} required />
               <button className="px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700" type="submit">Save</button>
             </div>
@@ -229,7 +229,7 @@ export default function Settings() {
                 {editingCardId === card.id ? (
                   <div className="flex items-center gap-2">
                     <input className="border border-white/50 bg-white/10 text-white rounded-md px-2 py-1" value={editCardForm.name} onChange={(e)=>setEditCardForm(v=>({ ...v, name:e.target.value }))} />
-                    <input className="border border-white/50 rounded-md px-2 py-1" type="color" value={editCardForm.color} onChange={(e)=>setEditCardForm(v=>({ ...v, color:e.target.value }))} />
+                    <input className="border border-white/50 rounded-md w-14 h-8 p-0 cursor-pointer bg-transparent [appearance:auto]" type="color" value={editCardForm.color} onChange={(e)=>setEditCardForm(v=>({ ...v, color:e.target.value }))} />
                     <input className="border border-white/50 bg-white/10 text-white rounded-md px-2 py-1 w-24" value={editCardForm.last4} onChange={(e)=>setEditCardForm(v=>({ ...v, last4:e.target.value.replace(/[^0-9]/g,'').slice(0,4) }))} />
                   </div>
                 ) : (
